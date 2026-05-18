@@ -102,6 +102,7 @@ import {
   useUpdateConversationEnabledTools,
 } from "@/lib/chat/chat.query";
 import { useChatAgentState } from "@/lib/chat/chat-agent-state.hook";
+import { inferReloadedAssistantResponsePending } from "@/lib/chat/chat-session-utils";
 import {
   useConversationShare,
   useForkConversation,
@@ -862,10 +863,19 @@ export function ChatPageContent({
   );
   const sendMessage = chatSession?.sendMessage;
   const status = chatSession?.status ?? "ready";
+  const isReloadedAssistantResponsePending =
+    inferReloadedAssistantResponsePending({
+      messages: persistedConversationMessages,
+      status,
+      chatErrors: conversation?.chatErrors,
+    });
+  const visibleStatus = isReloadedAssistantResponsePending
+    ? ("submitted" as const)
+    : status;
   const setMessages = chatSession?.setMessages;
   const stop = chatSession?.stop;
   const error =
-    status === "submitted" || status === "streaming"
+    visibleStatus === "submitted" || visibleStatus === "streaming"
       ? undefined
       : chatSession?.error;
   const addToolResult = chatSession?.addToolResult;
@@ -1104,7 +1114,7 @@ export function ChatPageContent({
   const handleSubmit: PromptInputProps["onSubmit"] = (message, e) => {
     e.preventDefault();
     if (isPlaywrightSetupVisible) return;
-    if (status === "submitted" || status === "streaming") {
+    if (visibleStatus === "submitted" || visibleStatus === "streaming") {
       if (conversationId) {
         // Set the cache flag first, THEN close the connection so the
         // connection-close handler on the backend finds the flag.
@@ -1587,7 +1597,7 @@ export function ChatPageContent({
     <div className="flex h-screen w-full">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex flex-col h-full">
-          <StreamTimeoutWarning status={status} messages={messages} />
+          <StreamTimeoutWarning status={visibleStatus} messages={messages} />
 
           <div
             className={cn(
@@ -1806,7 +1816,7 @@ export function ChatPageContent({
                     conversationId={conversationId}
                     agentId={currentProfileId || initialAgentId || undefined}
                     messages={messages}
-                    status={status}
+                    status={visibleStatus}
                     optimisticToolCalls={optimisticToolCalls}
                     isLoadingConversation={isLoadingConversation}
                     onMessagesUpdate={setMessages}
@@ -1925,7 +1935,7 @@ export function ChatPageContent({
                     <div className="max-w-4xl mx-auto space-y-3">
                       <ArchestraPromptInput
                         onSubmit={handleSubmit}
-                        status={status}
+                        status={visibleStatus}
                         selectedModel={conversation?.selectedModel ?? ""}
                         onModelChange={handleModelChange}
                         agentId={promptAgentId ?? activeAgentId}

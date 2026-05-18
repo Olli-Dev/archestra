@@ -1,5 +1,7 @@
 import type { UIMessage } from "@ai-sdk/react";
 
+const RELOADED_ASSISTANT_RESPONSE_PENDING_TIMEOUT_MS = 10 * 60 * 1000;
+
 /**
  * Preserves the last renderable assistant content when a live session update
  * temporarily regresses after streaming, either by replacing the assistant
@@ -136,4 +138,62 @@ function restoreTruncatedAssistantTail(params: {
 
 function sameMessageIdentity(a: UIMessage, b: UIMessage | undefined): boolean {
   return !!b && a.id === b.id && a.role === b.role;
+}
+
+export function inferReloadedAssistantResponsePending(params: {
+  messages: UIMessage[];
+  status: "ready" | "submitted" | "streaming" | "error";
+  chatErrors?: Array<{ createdAt?: string }>;
+  now?: number;
+  timeoutMs?: number;
+}): boolean {
+  const {
+    messages,
+    status,
+    chatErrors = [],
+    now = Date.now(),
+    timeoutMs = RELOADED_ASSISTANT_RESPONSE_PENDING_TIMEOUT_MS,
+  } = params;
+
+  if (status !== "ready") {
+    return false;
+  }
+
+  const lastMessage = messages.at(-1);
+  if (lastMessage?.role !== "user") {
+    return false;
+  }
+
+  const lastUserMessageCreatedAt = getMessageCreatedAt(lastMessage);
+  if (lastUserMessageCreatedAt === null) {
+    return false;
+  }
+
+  if (now - lastUserMessageCreatedAt > timeoutMs) {
+    return false;
+  }
+
+  return !chatErrors.some((chatError) => {
+    if (!chatError.createdAt) {
+      return false;
+    }
+
+    const chatErrorCreatedAt = Date.parse(chatError.createdAt);
+    return (
+      Number.isFinite(chatErrorCreatedAt) &&
+      chatErrorCreatedAt >= lastUserMessageCreatedAt
+    );
+  });
+}
+
+function getMessageCreatedAt(message: UIMessage): number | null {
+  const createdAt =
+    typeof message.metadata === "object" &&
+    message.metadata !== null &&
+    "createdAt" in message.metadata &&
+    typeof message.metadata.createdAt === "string"
+      ? Date.parse(message.metadata.createdAt)
+      : NaN;
+
+  return Number.isFinite(createdAt) ? createdAt : null;
 }
