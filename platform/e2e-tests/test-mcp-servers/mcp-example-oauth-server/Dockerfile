@@ -1,4 +1,4 @@
-FROM node:24-alpine AS builder
+FROM node:24.22.1-alpine3.23@sha256:0468540aa58203ff9e40c2aab3907c52644ab818af6176b1c70a026137dc92a2 AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ RUN apk add --no-cache git && \
 RUN npm ci && npm run build
 
 # --- Runtime stage ---
-FROM node:24-alpine
+FROM node:24.22.1-alpine3.23@sha256:0468540aa58203ff9e40c2aab3907c52644ab818af6176b1c70a026137dc92a2
 
 WORKDIR /app
 
