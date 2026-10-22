@@ -1,5 +1,5 @@
 ARG PYTHON_IMAGE=python:3.12-alpine@sha256:236173eb74001afe2f60862de935b74fcbd00adfca247b2c27051a70a6a39a2d
-ARG NODE_IMAGE=node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+ARG NODE_IMAGE=node:24.22.1-alpine3.23@sha256:0468540aa58203ff9e40c2aab3907c52644ab818af6176b1c70a026137dc92a2
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b
 # Go toolchain is sourced from the official golang:alpine image because Alpine's
 # community repo lags upstream Go patch releases. Stays binary-compatible since
@@ -68,7 +68,6 @@ FROM ${PYTHON_IMAGE}
 
 # Install runtime dependencies only (npm copied from node-builder stage to avoid Alpine CVE)
 RUN apk add --no-cache \
-   nodejs \
    libstdc++ \
    libgcc \
    openssl \
@@ -97,13 +96,15 @@ RUN apk add --no-cache \
    # Go runtime is copied from the golang:1.25.10-alpine image below to pick up the
    # Go stdlib HIGH CVEs fixed in 1.25.10 (CVE-2026-42499/39836/39820/33814/33811) that
    # Alpine's apk index has not yet shipped as go-1.25.10-r0.
-   apk upgrade --no-cache nodejs bind openssl zlib expat
+   apk upgrade --no-cache bind openssl zlib expat
 
 # Go toolchain sourced from upstream Alpine-based image (Alpine apk currently ships go-1.25.9-r0)
 COPY --from=go-bin /usr/local/go /usr/local/go
 
 # Copy npm from node-builder stage to avoid Alpine's vulnerable npm package
-# node:20-alpine has npm in /usr/local/lib/node_modules/npm
+# Copy the patched Node executable and npm from the same verified image.
+COPY --from=node-builder /usr/local/bin/node /usr/local/bin/node
+RUN test "$(node --version)" = "v24.22.1"
 COPY --from=node-builder /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
